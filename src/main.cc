@@ -3,6 +3,8 @@
 #include <sys/ioctl.h>
 #include <opencv2/opencv.hpp>
 
+#define PESERVE_ASPECT 0
+
 std::string rgb_to_ascii(cv::Vec3b pixel)
 {
   // set color using ANSI escape sequences
@@ -32,20 +34,41 @@ void display_image(cv::Mat im)
 
 int main(int argc, char* argv[])
 {
+  
   struct winsize ws;
   ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
 
   if(argc == 1) return -1; //no image specified
-
-  cv::Mat image; //stack-allocated matrix
   
   cv::String fname(argv[1]);
+  cv::Mat image = cv::imread(fname); //stack-allocated matrix
+
+  if(!image.data)
+  {
+    std::cout << "Error reading image" << std::endl ;
+    return -1;
+  }
+
+  cv::Size new_size;
+  cv::Mat image_resized;
+
+  if(PESERVE_ASPECT)
+  {
+    double s = std::min((double)ws.ws_row/image.rows, (double)ws.ws_col/image.cols);
+    new_size = cv::Size(2 * image.cols * s, image.rows * s);
+    image_resized = cv::Mat(new_size, CV_8UC3, cv::Scalar(0, 0, 0));
+  }
+  else
+  {
+    // fulscreen (default)
+    new_size = cv::Size(ws.ws_col, ws.ws_row);
+    image_resized = cv::Mat(new_size, CV_8UC3, cv::Scalar(0, 0, 0));
+  }
+
+  cv::resize(image, image_resized, new_size);
   image = cv::imread(fname);
 
-  cv::Mat image_small(ws.ws_row, ws.ws_col, CV_8UC3, cv::Scalar(0, 0, 0));
-  
-  cv::resize(image, image_small, cv::Size(ws.ws_col, ws.ws_row));
-  display_image(image_small);
+  display_image(image_resized);
 
   return 0;
 }
